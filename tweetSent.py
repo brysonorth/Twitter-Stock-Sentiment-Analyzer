@@ -4,7 +4,8 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import pandas as pd
 import re
 
-def tweetSent(sentence):
+
+def tweetSent(sentence): 
     cleanSentence = removePattern(sentence, '@')
     cleanSentence = cleanSentence.replace("[^a-zA-Z#]", " ")
     #cleanSentence= cleanSentence.apply(lambda x: ' '.join([w for w in x.split() if len(w)>3]))
@@ -13,7 +14,7 @@ def tweetSent(sentence):
     return vs
 
 
-def removePattern(input_txt, pattern):
+def removePattern(input_txt, pattern): #remove words using given symbol or string ex. @ 
     r = re.findall(pattern, input_txt)
     for i in r:
         input_txt = re.sub(i, '', input_txt)
