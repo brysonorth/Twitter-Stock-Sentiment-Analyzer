@@ -1,7 +1,6 @@
 #find sentiment of tweet 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 #import numpy as np
-import pandas as pd
 import re
 
 
@@ -10,7 +9,8 @@ def tweetSent(sentence):
     cleanSentence = cleanSentence.replace("[^a-zA-Z#]", " ")
     #cleanSentence= cleanSentence.apply(lambda x: ' '.join([w for w in x.split() if len(w)>3]))
     analyzer = SentimentIntensityAnalyzer()
-    vs = analyzer.polarity_scores(cleanSentence)
+    sentiment = analyzer.polarity_scores(cleanSentence)
+    vs = sentiment['compound']
     return vs
 
 
