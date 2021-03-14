@@ -1,12 +1,12 @@
 import tweepy
 import hidden
-import pprint
 import tweetSent
+import html
 import pandas as pd
-
+import dbConnect 
+from NASDAQlist import *
 
 secrets = hidden.oauth() #pulls accesss tokens from hidden.py
-
 
 #authenticates and connects to twitter API
 auth = tweepy.OAuthHandler(secrets['consumer_key'], secrets['consumer_secret'])
@@ -14,18 +14,19 @@ auth.set_access_token(secrets['access_token'], secrets['access_token_secret'])
 api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
 #notifies if rate limit is reached and waits until 15 minute wait time is up
 
-#query = 'TSLA -filter:retweets' #finds query and filter out retweets
-max_tweets = 4
+
+max_tweets = 1
 searched_tweets = []
 last_id = -1
-stocksList = ['TSLA', '$BB', 'GME', 'ICLN']
-tweetList = []
+#stocksList = ['$NVDA', '$NFLX', '$AAPL']
+scores = []
 scoreList = []
+tickList = []
 
 for stock in stocksList:
+    # query to search. filters out retweets
     query = stock + ' -filter:retweets'
-    while len(searched_tweets) < max_tweets: #max tweets to return. limited by API rate limit
-         #filters retweets for query 
+    while len(searched_tweets) < max_tweets: #max tweets to return. limited by API rate limit 
         count = max_tweets - len(searched_tweets)
         try:
             #finds recent tweets containing query, and are english. 
@@ -33,9 +34,14 @@ for stock in stocksList:
             new_tweets = api.search(q=query, lang='en', count=count, result_type='mixed', max_id=str(last_id - 1))
             if not new_tweets:
                 break
-
-            searched_tweets = new_tweets
-            last_id = new_tweets[-1].id
+            
+            #excludes tweet beginning with '@' to avoid replies
+            for tweet in new_tweets:
+                currenttweet = html.unescape(tweet.text)
+                if not currenttweet[:1].startswith('@'):
+                    searched_tweets.append(tweet)
+                    last_id = new_tweets[-1].id
+        
         except tweepy.TweepError as e:
             # depending on TweepError.code, one may want to retry or wait
             # to keep things simple, we will give up on an error
@@ -43,22 +49,46 @@ for stock in stocksList:
     
     for tweet in searched_tweets:
         text = tweet.text
-        scoreList.append(tweetSent.tweetSent(text))
+        #list dictionaries of tickers and tweets including given ticker
+        tickList.append({'stock': stock, 'text':text}) 
+
+    try:
+        #converts tickList into dataframe
+        df = pd.DataFrame.from_dict(tickList)
+        df['text'] =  tweetSent.clean_tweets(df['text'])
+
+        #calls sentiment analyzer funcction and returns a compounded score
+        for i in range (df['text'].shape[0]):
+            compound = tweetSent.tweetSent(df['text'][i])
+            scores.append({'compound':compound})
+
+        #joining the tweets df with the scores df    
+        sentScore = pd.DataFrame.from_dict(scores)
+        df = df.join(sentScore)
+
+        #find average of sentiment scores for a given stock
+        scoreAvg = df['compound'].mean()
+        scoreAvg = round(scoreAvg, 5)
+        scoreList.append({'stock':stock, 'score': scoreAvg})
+        #print(df)
     
-    scoreAvg = sum(scoreList)/len(scoreList)
-    scoreTuple = (stock, scoreAvg)
-    tweetList.append(scoreTuple)
+    #if tweepy returns a none type for a given query, move to next stock 
+    except KeyError:
+        continue
+    
+    #clear lists
+    tickList.clear()
+    scores.clear()
     searched_tweets.clear()
+    new_tweets.clear()
 
-
-df = pd.DataFrame(tweetList, columns=['tweetOG', 'Score'])
-    
+dbConnect.dbConnect(scoreList)
 
 #remaingi rate limit from twitter API
 limits = api.rate_limit_status()
 remain_search_limits = limits['resources']['search']['/search/tweets']['remaining']
 
-print (df)
+
 print('-----------------------------------------------------------------')
 print ('Remaining Rate', remain_search_limits)
-
+print(scoreList)
