@@ -4,6 +4,7 @@ import numpy as np
 import re
 
 def tweetSent(tweet): 
+    #returns a compounded score from a tweet that runs through the Vader sentiment analyzer
     analyzer = SentimentIntensityAnalyzer()
     sentiment = analyzer.polarity_scores(tweet)
     vs = sentiment['compound']
